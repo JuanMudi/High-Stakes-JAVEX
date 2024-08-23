@@ -1,9 +1,9 @@
 #include "main.h"
 #include "apix.h"
-#include <fcntl.h>      // POSIX open()
-#include <unistd.h>     // POSIX close() and related functions
-#include <stdio.h>      // Header para printf()
-#include <cstring>      // Header para memset()
+#include <fcntl.h>	// POSIX open()
+#include <unistd.h> // POSIX close() and related functions
+#include <stdio.h>	// Header para printf()
+#include <cstring>	// Header para memset()
 
 /**
  * A callback function for LLEMU's center button.
@@ -11,12 +11,16 @@
  * When this callback is fired, it will toggle line 2 of the LCD text between
  * "I was pressed!" and nothing.
  */
-void on_center_button() {
+void on_center_button()
+{
 	static bool pressed = false;
 	pressed = !pressed;
-	if (pressed) {
+	if (pressed)
+	{
 		pros::lcd::set_text(2, "I was pressed!");
-	} else {
+	}
+	else
+	{
 		pros::lcd::clear_line(2);
 	}
 }
@@ -27,48 +31,55 @@ void on_center_button() {
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
-void readPipe() {
-    pros::c::serctl(SERCTL_DISABLE_COBS, nullptr);
+void readPipe()
+{
+	pros::c::serctl(SERCTL_DISABLE_COBS, nullptr);
 
-    int32_t fd = open("serial", O_RDWR);  // Abre el archivo serial en modo lectura/escritura
-    if (fd == -1) {
-        printf("Error al abrir el pipe serial.\n");
-        return;
-    }
+	int32_t fd = open("serial", O_RDWR); // Abre el archivo serial en modo lectura/escritura
+	if (fd == -1)
+	{
+		printf("Error al abrir el pipe serial.\n");
+		return;
+	}
 
-    // Configurar la tasa de baudios a 9600
-    pros::c::fdctl(fd, DEVCTL_SET_BAUDRATE, (void*)9600);
+	// Configurar la tasa de baudios a 9600
+	pros::c::fdctl(fd, DEVCTL_SET_BAUDRATE, (void *)9600);
 
-    // Buffer para almacenar los datos leídos
-    char buffer[256];  // Tamaño del buffer, ajusta según tus necesidades
-    ssize_t bytesRead;
+	// Buffer para almacenar los datos leídos
+	char buffer[256]; // Tamaño del buffer, ajusta según tus necesidades
+	ssize_t bytesRead;
 
-    // Bucle para leer continuamente del pipe
-    while (true) {
-        memset(buffer, 0, sizeof(buffer));  // Limpia el buffer
-        bytesRead = read(fd, buffer, sizeof(buffer) - 1);  // Lee los datos
+	// Bucle para leer continuamente del pipe
+	while (true)
+	{
+		memset(buffer, 0, sizeof(buffer));				  // Limpia el buffer
+		bytesRead = read(fd, buffer, sizeof(buffer) - 1); // Lee los datos
 
-        if (bytesRead > 0) {
-            buffer[bytesRead] = '\0';  // Asegura que el buffer esté terminado en null
-            printf("Datos recibidos: %s\n", buffer);  // Imprime los datos recibidos
-        } else if (bytesRead == -1) {
-            printf("Error al leer desde el pipe serial.\n");
-            break;  // Sale del bucle en caso de error
-        }
+		if (bytesRead > 0)
+		{
+			buffer[bytesRead] = '\0';				 // Asegura que el buffer esté terminado en null
+			printf("Datos recibidos: %s\n", buffer); // Imprime los datos recibidos
+		}
+		else if (bytesRead == -1)
+		{
+			printf("Error al leer desde el pipe serial.\n");
+			break; // Sale del bucle en caso de error
+		}
 
-        pros::delay(20);  // Retardo para no sobrecargar el bucle
-    }
+		pros::delay(20); // Retardo para no sobrecargar el bucle
+	}
 
-    close(fd);  // Cierra el archivo descriptor al finalizar
+	close(fd); // Cierra el archivo descriptor al finalizar
 }
 
-
-
-void initialize() {
+void initialize()
+{
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Hello PROS User!");
-
 	pros::lcd::register_btn1_cb(on_center_button);
+
+	// Crear un hilo para ejecutar la función readPipe
+	pros::Task readPipeTask(readPipe); // Crea un nuevo hilo que ejecuta la función readPipe
 }
 
 /**
@@ -77,7 +88,6 @@ void initialize() {
  * the robot is enabled, this task will exit.
  */
 void disabled() {}
-
 
 /**
  * Runs after initialize(), and before autonomous when connected to the Field
@@ -116,22 +126,23 @@ void autonomous() {}
  * operator control task will be stopped. Re-enabling the robot will restart the
  * task, not resume it from where it left off.
  */
-void opcontrol() {
+void opcontrol()
+{
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
-	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
+	pros::MotorGroup left_mg({1, -2, 3});	// Creates a motor group with forwards ports 1 & 3 and reversed port 2
+	pros::MotorGroup right_mg({-4, 5, -6}); // Creates a motor group with forwards port 5 and reversed ports 4 & 6
 
-
-	while (true) {
+	while (true)
+	{
 		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
+						 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
+						 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0); // Prints status of the emulated screen LCDs
 
 		// Arcade control scheme
-		int dir = master.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
-		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
-		left_mg.move(dir - turn);                      // Sets left motor voltage
-		right_mg.move(dir + turn);                     // Sets right motor voltage
-		pros::delay(20);                               // Run for 20 ms then update
+		int dir = master.get_analog(ANALOG_LEFT_Y);	  // Gets amount forward/backward from left joystick
+		int turn = master.get_analog(ANALOG_RIGHT_X); // Gets the turn left/right from right joystick
+		left_mg.move(dir - turn);					  // Sets left motor voltage
+		right_mg.move(dir + turn);					  // Sets right motor voltage
+		pros::delay(20);							  // Run for 20 ms then update
 	}
 }
